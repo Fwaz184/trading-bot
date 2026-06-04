@@ -34,16 +34,16 @@ const SYSTEM_PROMPT = `أنت محلل تداول خبير للسوق السعو
 
 📌 *نقاط الدخول والخروج*
 لكل سهم:
-• الدخول: [السعر]
-• H1 (+5-8%): [السعر] ← بع 50% هنا
-• H2 (+10-15%): [السعر] ← بع 50% هنا
-• Stop (-4%): [السعر] ← اخرج بالكامل
-• R:R: 1:2+
+- الدخول: [السعر]
+- H1 (+5-8%): [السعر] ← بع 50% هنا
+- H2 (+10-15%): [السعر] ← بع 50% هنا
+- Stop (-4%): [السعر] ← اخرج بالكامل
+- R:R: 1:2+
 
 ⚠️ *إدارة المخاطر*
-• لا تخاطر بأكثر من 2% من رأس المال
-• Stop Loss إلزامي قبل الدخول
-• R:R لا تقل عن 1:2
+- لا تخاطر بأكثر من 2% من رأس المال
+- Stop Loss إلزامي قبل الدخول
+- R:R لا تقل عن 1:2
 
 الفلاتر المطبقة:
 ✓ D/E > 2 خارج البنوك → مرفوض
@@ -52,10 +52,8 @@ const SYSTEM_PROMPT = `أنت محلل تداول خبير للسوق السعو
 
 ⚖️ _هذا التحليل لأغراض تعليمية فقط_`;
 
-// ─── حالات المستخدمين (في الذاكرة) ───
 const sessions = {};
 
-// ─── إرسال رسالة لتيليغرام ───
 async function sendTelegram(chatId, text, keyboard = null) {
   const body = {
     chat_id: chatId,
@@ -76,7 +74,6 @@ async function sendTelegram(chatId, text, keyboard = null) {
   );
 }
 
-// ─── إرسال "جاري الكتابة..." ───
 async function sendTyping(chatId) {
   await fetch(
     `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendChatAction`,
@@ -88,7 +85,6 @@ async function sendTyping(chatId) {
   );
 }
 
-// ─── استدعاء Claude API مع web_search ───
 async function analyzeWithClaude(market, tradingType, scope) {
   const today = new Date().toLocaleDateString("ar-SA", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -132,7 +128,6 @@ async function analyzeWithClaude(market, tradingType, scope) {
 
   const data = await response.json();
 
-  // استخرج النص من كل الـ content blocks
   const text = (data.content || [])
     .filter(b => b.type === "text")
     .map(b => b.text)
@@ -141,11 +136,9 @@ async function analyzeWithClaude(market, tradingType, scope) {
   return text || "عذراً، لم أتمكن من إنشاء التحليل. حاول مجدداً.";
 }
 
-// ─── معالجة callback من الأزرار ───
 async function handleCallback(chatId, callbackData, messageId) {
   const session = sessions[chatId] || {};
 
-  // إجابة الـ callback فوراً (تزيل علامة التحميل)
   await fetch(
     `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/answerCallbackQuery`,
     {
@@ -155,7 +148,6 @@ async function handleCallback(chatId, callbackData, messageId) {
     }
   );
 
-  // ─── اختيار السوق ───
   if (["saudi", "us", "both"].includes(callbackData)) {
     sessions[chatId] = { ...session, market: callbackData, step: "type" };
     const marketNames = {
@@ -182,7 +174,6 @@ async function handleCallback(chatId, callbackData, messageId) {
     return;
   }
 
-  // ─── اختيار نوع التداول ───
   if (callbackData.startsWith("type_")) {
     const type = callbackData.replace("type_", "");
     sessions[chatId] = { ...session, tradingType: type, step: "scope" };
@@ -196,14 +187,12 @@ async function handleCallback(chatId, callbackData, messageId) {
     return;
   }
 
-  // ─── اختيار النطاق العام ───
   if (callbackData === "scope_general") {
     sessions[chatId] = { ...session, scope: "أفضل الأسهم تلقائياً", step: "analyzing" };
     await runAnalysis(chatId);
     return;
   }
 
-  // ─── اختيار أسهم محددة ───
   if (callbackData === "scope_specific") {
     sessions[chatId] = { ...session, step: "waiting_scope" };
     const hint = session.market === "saudi"
@@ -215,7 +204,6 @@ async function handleCallback(chatId, callbackData, messageId) {
     return;
   }
 
-  // ─── تحليل جديد ───
   if (callbackData === "new_analysis") {
     delete sessions[chatId];
     await startFlow(chatId);
@@ -223,7 +211,6 @@ async function handleCallback(chatId, callbackData, messageId) {
   }
 }
 
-// ─── تشغيل التحليل ───
 async function runAnalysis(chatId) {
   const session = sessions[chatId];
   if (!session?.market || !session?.tradingType) {
@@ -243,7 +230,6 @@ async function runAnalysis(chatId) {
       session.scope || "أفضل الأسهم"
     );
 
-    // تقسيم الرسالة إذا كانت طويلة (تيليغرام حد 4096 حرف)
     const chunks = [];
     let remaining = analysis;
     while (remaining.length > 3800) {
@@ -272,7 +258,6 @@ async function runAnalysis(chatId) {
   }
 }
 
-// ─── بدء التدفق ───
 async function startFlow(chatId, userName = "") {
   sessions[chatId] = { step: "market" };
   const greeting = userName ? `أهلاً *${userName}*! 👋\n\n` : "";
@@ -290,8 +275,7 @@ async function startFlow(chatId, userName = "") {
   );
 }
 
-// ─── الـ Handler الرئيسي ───
-module.export= default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).json({ ok: true, message: "Trading Bot is running ✅" });
   }
@@ -299,27 +283,23 @@ module.export= default async function handler(req, res) {
   try {
     const body = req.body;
 
-    // ─── Callback Query (أزرار) ───
     if (body.callback_query) {
-      const { id, data, message, from } = body.callback_query;
+      const { id, data, message } = body.callback_query;
       await handleCallback(message.chat.id, data, id);
       return res.status(200).json({ ok: true });
     }
 
-    // ─── رسالة نصية ───
     if (body.message) {
       const { chat, text, from } = body.message;
       const chatId = chat.id;
       const userName = from?.first_name || "";
       const session = sessions[chatId] || {};
 
-      // أوامر البدء
       if (text === "/start" || text === "/تداول" || text === "/تحليل") {
         await startFlow(chatId, userName);
         return res.status(200).json({ ok: true });
       }
 
-      // مساعدة
       if (text === "/help" || text === "/مساعدة") {
         await sendTelegram(chatId,
           `📖 *دليل المستخدم*\n\n` +
@@ -339,14 +319,12 @@ module.export= default async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
-      // إدخال أسهم محددة
       if (session.step === "waiting_scope" && text && !text.startsWith("/")) {
         sessions[chatId] = { ...session, scope: text, step: "analyzing" };
         await runAnalysis(chatId);
         return res.status(200).json({ ok: true });
       }
 
-      // رسالة غير معروفة
       if (!text?.startsWith("/")) {
         await sendTelegram(chatId,
           `اضغط /تداول لبدء تحليل جديد 📊`,
@@ -360,4 +338,4 @@ module.export= default async function handler(req, res) {
     console.error("Webhook error:", err);
     return res.status(200).json({ ok: true });
   }
-}
+};
