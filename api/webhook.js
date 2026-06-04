@@ -118,12 +118,12 @@ async function analyzeWithClaude(market, tradingType, scope) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system: SYSTEM_PROMPT,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: userMsg }],
-    }),
+  model: "claude-opus-4-5",
+  max_tokens: 2000,
+  system: SYSTEM_PROMPT,
+  messages: [{ role: "user", content: userMsg }],
+}),
+
   });
 
   const data = await response.json();
