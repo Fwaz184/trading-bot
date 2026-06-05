@@ -1,4 +1,4 @@
-const { fetchMany, preFilter } = require("./skill-data");
+
 async function fetchOne(symbol) {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
