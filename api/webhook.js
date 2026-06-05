@@ -1,9 +1,9 @@
 // ============================================================
 // خبير المال v4.0 — جلب مباشر من Yahoo Finance
 // ============================================================
-
+ 
 const sessions = {};
-
+ 
 // ─── جلب سعر سهم من Yahoo Finance مباشرة ───
 async function getPrice(symbol) {
   try {
@@ -20,7 +20,7 @@ async function getPrice(symbol) {
     return { price: null, change: null };
   }
 }
-
+ 
 // ─── جلب أسعار جماعية ───
 async function getPrices(symbols) {
   const results = {};
@@ -31,7 +31,7 @@ async function getPrices(symbols) {
   );
   return results;
 }
-
+ 
 // ─── اختيار الأسهم حسب السوق ───
 function getSymbols(market, tradingType) {
   const saudi = {
@@ -48,13 +48,13 @@ function getSymbols(market, tradingType) {
     year1:  ["NVDA","META","MSFT","AMZN","GOOGL","AAPL","AVGO","PLTR"],
     year3:  ["NVDA","META","MSFT","AMZN","GOOGL","AAPL","AVGO","PLTR","APP"],
   };
-
+ 
   if (market === "saudi") return saudi[tradingType] || saudi.monthly;
   if (market === "us")    return us[tradingType]    || us.monthly;
   return [...(saudi[tradingType] || saudi.monthly).slice(0,4),
           ...(us[tradingType]    || us.monthly).slice(0,4)];
 }
-
+ 
 // ─── بناء System Prompt مع الأسعار الحية ───
 function buildSystemPrompt(pricesText, market, tradingType) {
   const typeGuide = {
@@ -64,21 +64,21 @@ function buildSystemPrompt(pricesText, market, tradingType) {
     year1:   "استثمار سنة — أساسيات قوية + تنوع قطاعي",
     year3:   "استثمار 3 سنوات — نمو طويل الأجل",
   };
-
+ 
   return `أنت محلل تداول خبير. الأسعار الحية الآن من Yahoo Finance:
-
+ 
 ${pricesText}
-
+ 
 نوع التداول: ${typeGuide[tradingType] || tradingType}
-
+ 
 قدّم تحليلاً احترافياً بهذا التنسيق المناسب لتيليغرام:
-
+ 
 📡 *المصدر:* Yahoo Finance | [الوقت الحالي]
 📊 *المؤشر:* [اسم المؤشر + قيمته التقريبية]
 🌡 *المناخ:* [صاعد/هابط/محايد]
-
+ 
 ثم لكل سهم تختاره (اختر أفضل 3-5 حسب النوع):
-
+ 
 *[رقم]. [اسم الشركة] ([الرمز])*
 ┌─────────────────
 💰 السعر: [السعر من الأسعار أعلاه]
@@ -92,23 +92,23 @@ ${pricesText}
 🛑 Stop [-%]: [سعر]
 ⚖️ R:R: 1:[X]
 └─────────────────
-
+ 
 في النهاية:
 ⚠️ *إدارة المخاطر*
 • 2% حد أقصى للمخاطرة في صفقة واحدة
 • Stop Loss إلزامي | R:R لا تقل عن 1:2
 ✓ الفلاتر: D/E < 2 | FCF موجب | فوق MA200
-
+ 
 ⚖️ _تعليمي فقط — ليس نصيحة استثمارية_`;
 }
-
+ 
 // ─── استدعاء Claude للتحليل ───
 async function analyzeWithClaude(market, tradingType, scope) {
   const symbols  = getSymbols(market, tradingType);
   const prices   = await getPrices(symbols);
   const now      = new Date().toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
   const currency = market === "us" ? "$" : "﷼";
-
+ 
   // بناء نص الأسعار
   const pricesText = symbols.map(s => {
     const p = prices[s];
@@ -118,15 +118,15 @@ async function analyzeWithClaude(market, tradingType, scope) {
     const priceStr  = p.price ? `${p.price} ${currency}` : "غير متاح";
     return `• ${s}: ${priceStr} (${changeStr})`;
   }).join("\n");
-
+ 
   const systemPrompt = buildSystemPrompt(pricesText, market, tradingType);
-
+ 
   const userMsg = `التاريخ والوقت: ${now}
 السوق: ${market === "saudi" ? "السوق السعودي" : market === "us" ? "السوق الأمريكي" : "كلا السوقين"}
 النطاق: ${scope}
-
+ 
 قدّم التحليل الكامل بناءً على الأسعار الحية أعلاه.`;
-
+ 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -141,16 +141,16 @@ async function analyzeWithClaude(market, tradingType, scope) {
       messages: [{ role: "user", content: userMsg }],
     }),
   });
-
+ 
   const data = await res.json();
   const text = (data.content || [])
     .filter(b => b.type === "text")
     .map(b => b.text)
     .join("\n");
-
+ 
   return text || "عذراً، حدث خطأ في التحليل. حاول مجدداً.";
 }
-
+ 
 // ─── إرسال رسالة ───
 async function sendTelegram(chatId, text, keyboard = null) {
   const body = {
@@ -165,7 +165,7 @@ async function sendTelegram(chatId, text, keyboard = null) {
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
   );
 }
-
+ 
 async function sendTyping(chatId) {
   await fetch(
     `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendChatAction`,
@@ -173,7 +173,7 @@ async function sendTyping(chatId) {
       body: JSON.stringify({ chat_id: chatId, action: "typing" }) }
   );
 }
-
+ 
 // ─── بدء المحادثة ───
 async function startFlow(chatId, userName = "") {
   sessions[chatId] = { step: "market" };
@@ -189,7 +189,7 @@ async function startFlow(chatId, userName = "") {
     ]
   );
 }
-
+ 
 // ─── تشغيل التحليل ───
 async function runAnalysis(chatId) {
   const session = sessions[chatId];
@@ -197,19 +197,19 @@ async function runAnalysis(chatId) {
     await startFlow(chatId);
     return;
   }
-
+ 
   await sendTyping(chatId);
   await sendTelegram(chatId,
     `⏳ *جاري التحليل...*\n\n📡 جلب الأسعار من Yahoo Finance...\n🔍 تطبيق فلاتر المهارة v2.2...\n📊 حساب H1 وH2 وStop Loss...\n\n_15-30 ثانية_`
   );
-
+ 
   try {
     const analysis = await analyzeWithClaude(
       session.market,
       session.tradingType,
       session.scope || "أفضل الأسهم مع تنويع القطاعات"
     );
-
+ 
     const chunks = [];
     let remaining = analysis;
     while (remaining.length > 3500) {
@@ -218,7 +218,7 @@ async function runAnalysis(chatId) {
       remaining = remaining.slice(cutAt > 0 ? cutAt : 3500);
     }
     chunks.push(remaining);
-
+ 
     for (let i = 0; i < chunks.length; i++) {
       const isLast = i === chunks.length - 1;
       await sendTelegram(
@@ -227,9 +227,9 @@ async function runAnalysis(chatId) {
       );
       if (!isLast) await new Promise(r => setTimeout(r, 500));
     }
-
+ 
     sessions[chatId] = { ...session, step: "done" };
-
+ 
   } catch (err) {
     await sendTelegram(chatId,
       `❌ *خطأ:* ${err.message}\n\nحاول مجدداً /تداول`,
@@ -237,17 +237,17 @@ async function runAnalysis(chatId) {
     );
   }
 }
-
+ 
 // ─── معالجة الأزرار ───
 async function handleCallback(chatId, callbackData, messageId) {
   const session = sessions[chatId] || {};
-
+ 
   await fetch(
     `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/answerCallbackQuery`,
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ callback_query_id: messageId }) }
   );
-
+ 
   if (["saudi", "us", "both"].includes(callbackData)) {
     sessions[chatId] = { ...session, market: callbackData, step: "type" };
     const names = { saudi: "السوق السعودي 🇸🇦", us: "السوق الأمريكي 🇺🇸", both: "كلا السوقين 🌍" };
@@ -267,7 +267,7 @@ async function handleCallback(chatId, callbackData, messageId) {
     );
     return;
   }
-
+ 
   if (callbackData.startsWith("type_")) {
     const type = callbackData.replace("type_", "");
     sessions[chatId] = { ...session, tradingType: type, step: "scope" };
@@ -280,13 +280,13 @@ async function handleCallback(chatId, callbackData, messageId) {
     );
     return;
   }
-
+ 
   if (callbackData === "scope_general") {
     sessions[chatId] = { ...session, scope: "أفضل الأسهم مع تنويع القطاعات", step: "analyzing" };
     await runAnalysis(chatId);
     return;
   }
-
+ 
   if (callbackData === "scope_specific") {
     sessions[chatId] = { ...session, step: "waiting_scope" };
     const hint = session.market === "saudi"
@@ -295,40 +295,40 @@ async function handleCallback(chatId, callbackData, messageId) {
     await sendTelegram(chatId, `✏️ *اكتب رموز الأسهم:*\n\n_${hint}_`);
     return;
   }
-
+ 
   if (callbackData === "new_analysis") {
     delete sessions[chatId];
     await startFlow(chatId);
     return;
   }
 }
-
+ 
 // ─── Handler الرئيسي ───
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).json({ ok: true, message: "خبير المال v4.0 ✅" });
   }
-
+ 
   try {
     const body = req.body;
-
+ 
     if (body.callback_query) {
       const { id, data, message } = body.callback_query;
       await handleCallback(message.chat.id, data, id);
       return res.status(200).json({ ok: true });
     }
-
+ 
     if (body.message) {
       const { chat, text, from } = body.message;
       const chatId   = chat.id;
       const userName = from?.first_name || "";
       const session  = sessions[chatId] || {};
-
+ 
       if (text === "/start" || text === "/تداول" || text === "/تحليل") {
         await startFlow(chatId, userName);
         return res.status(200).json({ ok: true });
       }
-
+ 
       if (text === "/help" || text === "/مساعدة") {
         await sendTelegram(chatId,
           `📖 *دليل خبير المال*\n\n` +
@@ -344,7 +344,7 @@ module.exports = async function handler(req, res) {
         );
         return res.status(200).json({ ok: true });
       }
-
+ 
       if (session.step === "waiting_scope" && text && !text.startsWith("/")) {
         // تحويل رموز السعودي تلقائياً
         const scope = text.includes(".SR") ? text :
@@ -355,7 +355,7 @@ module.exports = async function handler(req, res) {
         await runAnalysis(chatId);
         return res.status(200).json({ ok: true });
       }
-
+ 
       if (!text?.startsWith("/")) {
         await sendTelegram(chatId,
           `اكتب /تداول لبدء تحليل جديد 📊`,
@@ -363,10 +363,11 @@ module.exports = async function handler(req, res) {
         );
       }
     }
-
+ 
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error("Error:", err);
     return res.status(200).json({ ok: true });
   }
 };
+ 
