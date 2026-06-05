@@ -362,7 +362,6 @@ module.exports = async function handler(req, res) {
           [[{ text: "📊 ابدأ التحليل", callback_data: "new_analysis" }]]
         );
       }
-    }
 
     return res.status(200).json({ ok: true });
   } catch (err) {
