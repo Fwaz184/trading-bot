@@ -51,10 +51,13 @@ async function analyzeWithClaude(stockData, tradingType) {
       ? `${Math.round((s.price - s.low52)/(s.high52 - s.low52)*100)}% من قاع 52أ`
       : "N/A";
     const vol  = s.volRatio >= 1.5 ? `🔥 حجم x${s.volRatio}` : `حجم x${s.volRatio}`;
-    dataText  += `${name} (${s.symbol}): ${s.price}﷼ | ${ch} | ${pos} | ${vol}\n`;
+   dataText += `${name} (${s.symbol}): [السعر الحالي: ${s.price}﷼ - استخدم هذا السعر بالضبط] | تغير: ${ch} | ${pos} | ${vol}\n`; | ${ch} | ${pos} | ${vol}\n`;
   });
 
   const systemPrompt = `أنت محلل متخصص في السوق السعودي (تاسي).
+  قاعدة صارمة: استخدم الأسعار الواردة أدناه بالضبط كما هي.
+لا تعدّل أي سعر ولا تقدّر من عندك.
+سعر الدخول يجب أن يكون ضمن نطاق السعر الحالي المذكور.
 ${SAUDI_CONTEXT}
 
 البيانات الحية:
