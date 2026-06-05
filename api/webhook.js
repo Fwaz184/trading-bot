@@ -1,162 +1,133 @@
 // ============================================================
-// محلل التداول الذكي v3.0 — Telegram Bot
-// مصدر البيانات: Yahoo Finance حصراً
-// تنسيق محسّن لتيليغرام
+// خبير المال v4.0 — جلب مباشر من Yahoo Finance
 // ============================================================
-
-const SYSTEM_PROMPT = `أنت محلل تداول خبير للسوق السعودي والأمريكي.
-
-## 🔴 إلزامي — جلب الأسعار من Yahoo Finance حصراً:
-
-### للسوق السعودي — استخدم web_search بهذا الشكل:
-- ابحث: "site:finance.yahoo.com 2222.SR" للحصول على سعر أرامكو
-- ابحث: "site:finance.yahoo.com 1120.SR" للراجحي  
-- ابحث: "site:finance.yahoo.com 1211.SR" لمعادن
-- ابحث: "site:finance.yahoo.com 7010.SR" لـ STC
-- ابحث: "site:finance.yahoo.com 1180.SR" لـ SNB
-- ابحث: "site:finance.yahoo.com 7020.SR" لموبايلي
-- ابحث: "site:finance.yahoo.com 4030.SR" لبحري
-- ابحث: "site:finance.yahoo.com 1010.SR" لبنك الرياض
-- ابحث: "site:finance.yahoo.com 2082.SR" لأكوا باور
-- ابحث: "site:finance.yahoo.com 1140.SR" لبنك البلاد
-
-أو ابحث مجمعاً: "yahoo finance 2222.SR 1120.SR 1211.SR 7010.SR سعر اليوم"
-
-### للسوق الأمريكي — استخدم web_search:
-- ابحث: "yahoo finance NVDA AAPL META MSFT AMZN stock price today"
-- ابحث: "yahoo finance PLTR AVGO GOOGL AMD stock price today"
-
-## ⚠️ مهم جداً:
-- لا تستخدم TradingView أو Investing.com أو أي مصدر آخر
-- إذا لم تجد السعر من Yahoo Finance، اذكر ذلك صراحةً
-- اذكر وقت جلب البيانات
-
-## 📊 نطاق التوصيات — مهم:
-حسب نوع التداول اختر أسهماً متنوعة:
-
-مضاربة يومية ⚡:
-- ركز على الأسهم عالية التذبذب والحجم
-- لا تقتصر على الكبرى — ابحث في Mid-cap أيضاً
-- أسهم لها أحداث محفزة (نتائج، أخبار، اختراقات)
-
-تداول أسبوعي 📈:
-- Large + Mid cap
-- اختر من قطاعات مختلفة
-- ابحث عن أسهم في بداية اتجاه صاعد
-
-استثمار طويل 🎯:
-- Large cap بأساسيات قوية
-- تنوع قطاعي إلزامي
-
-## 📱 هيكل الرد — محسَّن لتيليغرام:
-
-أولاً اكتب:
-📡 *المصدر:* Yahoo Finance | [التاريخ والوقت]
-📊 *المؤشر:* [اسم المؤشر + قيمته + نسبة التغير]
-🌡 *المناخ:* [صاعد/هابط/محايد + سبب مختصر]
-
-ثم لكل سهم اكتب بهذا الشكل بالضبط:
-
-[رقم] [اسم الشركة] ([الرمز])
-┌─────────────────────
-💰 السعر الحالي: [X] ﷼/$ 
-📈 التغير: [+/-X%]
-⭐ التوصية: [شراء/انتظار]
-🔑 السبب: [سطر واحد]
-├─────────────────────
-🎯 الدخول: [X - Y]
-✅ H1 ([+X%]): [السعر] ← بع 50%
-🚀 H2 ([+X%]): [السعر] ← بع 50%
-🛑 Stop ([-%X]): [السعر]
-⚖️ R:R: 1:[X]
-└─────────────────────
-✓ [سبب اجتياز الفلتر مختصر]
-
-بعد كل الأسهم اكتب:
-
-⚠️ *إدارة المخاطر*
-• لا تخاطر بأكثر من 2% في صفقة
-• Stop Loss إلزامي قبل الدخول
-• H1 → بع 50% | H2 → بع 50% الباقي
-
-الفلاتر المطبقة ✓
-D/E < 2 | FCF موجب | فوق MA200
-
-⚖️ _تعليمي فقط — ليس نصيحة استثمارية_`;
 
 const sessions = {};
 
-async function sendTelegram(chatId, text, keyboard = null) {
-  const body = {
-    chat_id: chatId,
-    text,
-    parse_mode: "Markdown",
-    disable_web_page_preview: true,
-  };
-  if (keyboard) body.reply_markup = { inline_keyboard: keyboard };
-
-  const res = await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }
-  );
-  return res.json();
+// ─── جلب سعر سهم من Yahoo Finance مباشرة ───
+async function getPrice(symbol) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const data = await res.json();
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    const prev  = data?.chart?.result?.[0]?.meta?.previousClose;
+    const change = price && prev ? (((price - prev) / prev) * 100).toFixed(2) : null;
+    return { price: price?.toFixed(2), change };
+  } catch {
+    return { price: null, change: null };
+  }
 }
 
-async function sendTyping(chatId) {
-  await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendChatAction`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, action: "typing" }),
-    }
+// ─── جلب أسعار جماعية ───
+async function getPrices(symbols) {
+  const results = {};
+  await Promise.all(
+    symbols.map(async (s) => {
+      results[s] = await getPrice(s);
+    })
   );
+  return results;
 }
 
-async function analyzeWithClaude(market, tradingType, scope) {
-  const today = new Date().toLocaleDateString("ar-SA", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-  const time = new Date().toLocaleTimeString("ar-SA", {
-    hour: "2-digit", minute: "2-digit",
-  });
-
-  const marketLabels = {
-    saudi: "السوق السعودي 🇸🇦",
-    us: "السوق الأمريكي 🇺🇸",
-    both: "كلا السوقين 🌍",
+// ─── اختيار الأسهم حسب السوق ───
+function getSymbols(market, tradingType) {
+  const saudi = {
+    day:    ["2222.SR","4240.SR","7020.SR","4030.SR","1211.SR"],
+    swing:  ["2222.SR","1120.SR","1211.SR","7010.SR","1180.SR","7020.SR"],
+    monthly:["2222.SR","1120.SR","1211.SR","7010.SR","1180.SR","4030.SR","2082.SR"],
+    year1:  ["2222.SR","1120.SR","1180.SR","1211.SR","7010.SR","4030.SR","2082.SR","1010.SR"],
+    year3:  ["2222.SR","1120.SR","1180.SR","1211.SR","7010.SR","2082.SR","4030.SR","7020.SR"],
   };
-  const typeLabels = {
-    day: "مضاربة يومية ⚡",
-    swing: "تداول أسبوعي 📈",
-    monthly: "تداول شهري 📅",
-    year1: "استثمار سنة 🎯",
-    year3: "استثمار 3 سنوات 🏆",
+  const us = {
+    day:    ["NVDA","MRVL","AMD","PLTR","HOOD"],
+    swing:  ["NVDA","META","AMZN","AVGO","PLTR","GOOGL"],
+    monthly:["NVDA","META","MSFT","AMZN","AVGO","GOOGL","AAPL"],
+    year1:  ["NVDA","META","MSFT","AMZN","GOOGL","AAPL","AVGO","PLTR"],
+    year3:  ["NVDA","META","MSFT","AMZN","GOOGL","AAPL","AVGO","PLTR","APP"],
   };
 
+  if (market === "saudi") return saudi[tradingType] || saudi.monthly;
+  if (market === "us")    return us[tradingType]    || us.monthly;
+  return [...(saudi[tradingType] || saudi.monthly).slice(0,4),
+          ...(us[tradingType]    || us.monthly).slice(0,4)];
+}
+
+// ─── بناء System Prompt مع الأسعار الحية ───
+function buildSystemPrompt(pricesText, market, tradingType) {
   const typeGuide = {
-    day: "اختر 3 أسهم عالية التذبذب والحجم — ابحث في small وmid cap أيضاً",
-    swing: "اختر 4 أسهم من قطاعات مختلفة — تنوع إلزامي",
-    monthly: "اختر 5 أسهم متنوعة القطاعات",
-    year1: "اختر 5 أسهم بأساسيات قوية من قطاعات مختلفة",
-    year3: "اختر 5 أسهم نمو طويل الأجل — تنوع قطاعي إلزامي",
+    day:     "مضاربة يومية — ركز على التذبذب والزخم والحجم",
+    swing:   "تداول أسبوعي — ابحث عن بداية اتجاه مع محفز",
+    monthly: "تداول شهري — تنوع القطاعات إلزامي",
+    year1:   "استثمار سنة — أساسيات قوية + تنوع قطاعي",
+    year3:   "استثمار 3 سنوات — نمو طويل الأجل",
   };
 
-  const userMsg = `طلب تحليل
-التاريخ: ${today} الساعة ${time}
-السوق: ${marketLabels[market]}
-النوع: ${typeLabels[tradingType]}
+  return `أنت محلل تداول خبير. الأسعار الحية الآن من Yahoo Finance:
+
+${pricesText}
+
+نوع التداول: ${typeGuide[tradingType] || tradingType}
+
+قدّم تحليلاً احترافياً بهذا التنسيق المناسب لتيليغرام:
+
+📡 *المصدر:* Yahoo Finance | [الوقت الحالي]
+📊 *المؤشر:* [اسم المؤشر + قيمته التقريبية]
+🌡 *المناخ:* [صاعد/هابط/محايد]
+
+ثم لكل سهم تختاره (اختر أفضل 3-5 حسب النوع):
+
+*[رقم]. [اسم الشركة] ([الرمز])*
+┌─────────────────
+💰 السعر: [السعر من الأسعار أعلاه]
+📈 التغير: [نسبة التغير]
+⭐ [شراء/انتظار/تجنب]
+🔑 [سبب مختصر]
+├─────────────────
+🎯 الدخول: [نطاق سعري]
+✅ H1 [+%]: [سعر] ← بع 50%
+🚀 H2 [+%]: [سعر] ← بع 50%
+🛑 Stop [-%]: [سعر]
+⚖️ R:R: 1:[X]
+└─────────────────
+
+في النهاية:
+⚠️ *إدارة المخاطر*
+• 2% حد أقصى للمخاطرة في صفقة واحدة
+• Stop Loss إلزامي | R:R لا تقل عن 1:2
+✓ الفلاتر: D/E < 2 | FCF موجب | فوق MA200
+
+⚖️ _تعليمي فقط — ليس نصيحة استثمارية_`;
+}
+
+// ─── استدعاء Claude للتحليل ───
+async function analyzeWithClaude(market, tradingType, scope) {
+  const symbols  = getSymbols(market, tradingType);
+  const prices   = await getPrices(symbols);
+  const now      = new Date().toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" });
+  const currency = market === "us" ? "$" : "﷼";
+
+  // بناء نص الأسعار
+  const pricesText = symbols.map(s => {
+    const p = prices[s];
+    const changeStr = p.change
+      ? (parseFloat(p.change) >= 0 ? `+${p.change}%` : `${p.change}%`)
+      : "غير متاح";
+    const priceStr  = p.price ? `${p.price} ${currency}` : "غير متاح";
+    return `• ${s}: ${priceStr} (${changeStr})`;
+  }).join("\n");
+
+  const systemPrompt = buildSystemPrompt(pricesText, market, tradingType);
+
+  const userMsg = `التاريخ والوقت: ${now}
+السوق: ${market === "saudi" ? "السوق السعودي" : market === "us" ? "السوق الأمريكي" : "كلا السوقين"}
 النطاق: ${scope}
-التوجيه: ${typeGuide[tradingType]}
 
-⚠️ استخدم web_search لجلب الأسعار من Yahoo Finance حصراً قبل التحليل.
-قدّم التحليل بالتنسيق المحدد المناسب لتيليغرام.`;
+قدّم التحليل الكامل بناءً على الأسعار الحية أعلاه.`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -166,118 +137,60 @@ async function analyzeWithClaude(market, tradingType, scope) {
     body: JSON.stringify({
       model: "claude-opus-4-5",
       max_tokens: 2000,
-      system: SYSTEM_PROMPT,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      system: systemPrompt,
       messages: [{ role: "user", content: userMsg }],
     }),
   });
 
-  const data = await response.json();
-
-  if (data.error) {
-    const response2 = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-opus-4-5",
-        max_tokens: 2000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMsg + "\n\nملاحظة: web_search غير متاح، استخدم أحدث بيانات متاحة لديك مع الإشارة للتاريخ." }],
-      }),
-    });
-    const data2 = await response2.json();
-    const text2 = (data2.content || [])
-      .filter(b => b.type === "text")
-      .map(b => b.text)
-      .join("\n");
-    return text2 || "عذراً، حدث خطأ. حاول مجدداً.";
-  }
-
+  const data = await res.json();
   const text = (data.content || [])
     .filter(b => b.type === "text")
     .map(b => b.text)
     .join("\n");
 
-  return text || "عذراً، حدث خطأ. حاول مجدداً.";
+  return text || "عذراً، حدث خطأ في التحليل. حاول مجدداً.";
 }
 
-async function handleCallback(chatId, callbackData, messageId) {
-  const session = sessions[chatId] || {};
-
+// ─── إرسال رسالة ───
+async function sendTelegram(chatId, text, keyboard = null) {
+  const body = {
+    chat_id: chatId,
+    text,
+    parse_mode: "Markdown",
+    disable_web_page_preview: true,
+  };
+  if (keyboard) body.reply_markup = { inline_keyboard: keyboard };
   await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/answerCallbackQuery`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ callback_query_id: messageId }),
-    }
+    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
   );
-
-  if (["saudi", "us", "both"].includes(callbackData)) {
-    sessions[chatId] = { ...session, market: callbackData, step: "type" };
-    const marketNames = {
-      saudi: "السوق السعودي 🇸🇦",
-      us: "السوق الأمريكي 🇺",
-      both: "كلا السوقين 🌍",
-    };
-    await sendTelegram(chatId,
-      `✅ *${marketNames[callbackData]}*\n\n📈 اختر نوع التداول:`,
-      [
-        [
-          { text: "⚡ مضاربة يومية", callback_data: "type_day" },
-          { text: "📈 أسبوعي", callback_data: "type_swing" },
-        ],
-        [
-          { text: "📅 شهري", callback_data: "type_monthly" },
-          { text: "🎯 استثمار سنة", callback_data: "type_year1" },
-        ],
-        [{ text: "🏆 استثمار 3 سنوات", callback_data: "type_year3" }],
-      ]
-    );
-    return;
-  }
-
-  if (callbackData.startsWith("type_")) {
-    const type = callbackData.replace("type_", "");
-    sessions[chatId] = { ...session, tradingType: type, step: "scope" };
-    await sendTelegram(chatId,
-      `✅ *نوع التداول محدد*\n\n🎯 اختر النطاق:`,
-      [
-        [{ text: "🌐 أفضل الأسهم تلقائياً", callback_data: "scope_general" }],
-        [{ text: "🔎 أسهم محددة (اكتبها)", callback_data: "scope_specific" }],
-      ]
-    );
-    return;
-  }
-
-  if (callbackData === "scope_general") {
-    sessions[chatId] = { ...session, scope: "أفضل الأسهم تلقائياً مع تنويع القطاعات", step: "analyzing" };
-    await runAnalysis(chatId);
-    return;
-  }
-
-  if (callbackData === "scope_specific") {
-    sessions[chatId] = { ...session, step: "waiting_scope" };
-    const hint = session.market === "saudi"
-      ? "مثال: أرامكو 2222، الراجحي 1120، معادن 1211"
-      : "مثال: NVDA, AAPL, META, AVGO";
-    await sendTelegram(chatId,
-      `✏️ *اكتب رموز الأسهم:*\n\n_${hint}_`
-    );
-    return;
-  }
-
-  if (callbackData === "new_analysis") {
-    delete sessions[chatId];
-    await startFlow(chatId);
-    return;
-  }
 }
 
+async function sendTyping(chatId) {
+  await fetch(
+    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendChatAction`,
+    { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action: "typing" }) }
+  );
+}
+
+// ─── بدء المحادثة ───
+async function startFlow(chatId, userName = "") {
+  sessions[chatId] = { step: "market" };
+  const greeting = userName ? `أهلاً *${userName}*! 👋\n\n` : "";
+  await sendTelegram(chatId,
+    `${greeting}📊 *خبير المال — محلل التداول الذكي*\n_أسعار حية من Yahoo Finance_\n\n🌐 اختر السوق:`,
+    [
+      [
+        { text: "🇸🇦 السعودي", callback_data: "saudi" },
+        { text: "🇺🇸 الأمريكي", callback_data: "us" },
+      ],
+      [{ text: "🌍 كلا السوقين", callback_data: "both" }],
+    ]
+  );
+}
+
+// ─── تشغيل التحليل ───
 async function runAnalysis(chatId) {
   const session = sessions[chatId];
   if (!session?.market || !session?.tradingType) {
@@ -309,8 +222,7 @@ async function runAnalysis(chatId) {
     for (let i = 0; i < chunks.length; i++) {
       const isLast = i === chunks.length - 1;
       await sendTelegram(
-        chatId,
-        chunks[i],
+        chatId, chunks[i],
         isLast ? [[{ text: "🔄 تحليل جديد", callback_data: "new_analysis" }]] : null
       );
       if (!isLast) await new Promise(r => setTimeout(r, 500));
@@ -326,24 +238,75 @@ async function runAnalysis(chatId) {
   }
 }
 
-async function startFlow(chatId, userName = "") {
-  sessions[chatId] = { step: "market" };
-  const greeting = userName ? `أهلاً *${userName}*! 👋\n\n` : "";
-  await sendTelegram(chatId,
-    `${greeting}📊 *خبير المال — محلل التداول الذكي*\n_أسعار حية من Yahoo Finance_\n\n🌐 اختر السوق:`,
-    [
-      [
-        { text: "🇸🇦 السعودي", callback_data: "saudi" },
-        { text: "🇺🇸 الأمريكي", callback_data: "us" },
-      ],
-      [{ text: "🌍 كلا السوقين", callback_data: "both" }],
-    ]
+// ─── معالجة الأزرار ───
+async function handleCallback(chatId, callbackData, messageId) {
+  const session = sessions[chatId] || {};
+
+  await fetch(
+    `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/answerCallbackQuery`,
+    { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: messageId }) }
   );
+
+  if (["saudi", "us", "both"].includes(callbackData)) {
+    sessions[chatId] = { ...session, market: callbackData, step: "type" };
+    const names = { saudi: "السوق السعودي 🇸🇦", us: "السوق الأمريكي 🇺🇸", both: "كلا السوقين 🌍" };
+    await sendTelegram(chatId,
+      `✅ *${names[callbackData]}*\n\n📈 اختر نوع التداول:`,
+      [
+        [
+          { text: "⚡ مضاربة يومية", callback_data: "type_day" },
+          { text: "📈 أسبوعي", callback_data: "type_swing" },
+        ],
+        [
+          { text: "📅 شهري", callback_data: "type_monthly" },
+          { text: "🎯 استثمار سنة", callback_data: "type_year1" },
+        ],
+        [{ text: "🏆 استثمار 3 سنوات", callback_data: "type_year3" }],
+      ]
+    );
+    return;
+  }
+
+  if (callbackData.startsWith("type_")) {
+    const type = callbackData.replace("type_", "");
+    sessions[chatId] = { ...session, tradingType: type, step: "scope" };
+    await sendTelegram(chatId,
+      `✅ *نوع التداول محدد*\n\n🎯 اختر النطاق:`,
+      [
+        [{ text: "🌐 أفضل الأسهم تلقائياً", callback_data: "scope_general" }],
+        [{ text: "🔎 أسهم محددة (اكتبها)", callback_data: "scope_specific" }],
+      ]
+    );
+    return;
+  }
+
+  if (callbackData === "scope_general") {
+    sessions[chatId] = { ...session, scope: "أفضل الأسهم مع تنويع القطاعات", step: "analyzing" };
+    await runAnalysis(chatId);
+    return;
+  }
+
+  if (callbackData === "scope_specific") {
+    sessions[chatId] = { ...session, step: "waiting_scope" };
+    const hint = session.market === "saudi"
+      ? "مثال: 2222.SR 1120.SR 1211.SR"
+      : "مثال: NVDA AAPL META AVGO";
+    await sendTelegram(chatId, `✏️ *اكتب رموز الأسهم:*\n\n_${hint}_`);
+    return;
+  }
+
+  if (callbackData === "new_analysis") {
+    delete sessions[chatId];
+    await startFlow(chatId);
+    return;
+  }
 }
 
+// ─── Handler الرئيسي ───
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(200).json({ ok: true, message: "خبير المال Bot v3.0 ✅" });
+    return res.status(200).json({ ok: true, message: "خبير المال v4.0 ✅" });
   }
 
   try {
@@ -357,9 +320,9 @@ module.exports = async function handler(req, res) {
 
     if (body.message) {
       const { chat, text, from } = body.message;
-      const chatId = chat.id;
+      const chatId   = chat.id;
       const userName = from?.first_name || "";
-      const session = sessions[chatId] || {};
+      const session  = sessions[chatId] || {};
 
       if (text === "/start" || text === "/تداول" || text === "/تحليل") {
         await startFlow(chatId, userName);
@@ -371,8 +334,8 @@ module.exports = async function handler(req, res) {
           `📖 *دليل خبير المال*\n\n` +
           `*/تداول* — تحليل جديد\n` +
           `*/مساعدة* — هذه الرسالة\n\n` +
-          `*المصادر:* Yahoo Finance\n` +
-          `*الفلاتر:* D/E | FCF | MA200\n\n` +
+          `📡 *المصدر:* Yahoo Finance (حي)\n` +
+          `🔍 *الفلاتر:* D/E | FCF | MA200\n\n` +
           `*استراتيجية الخروج:*\n` +
           `✅ H1 → بع 50%\n` +
           `🚀 H2 → بع 50% الباقي\n` +
@@ -383,7 +346,12 @@ module.exports = async function handler(req, res) {
       }
 
       if (session.step === "waiting_scope" && text && !text.startsWith("/")) {
-        sessions[chatId] = { ...session, scope: text, step: "analyzing" };
+        // تحويل رموز السعودي تلقائياً
+        const scope = text.includes(".SR") ? text :
+          session.market === "saudi"
+            ? text.replace(/(\d{4})/g, "$1.SR")
+            : text;
+        sessions[chatId] = { ...session, scope, step: "analyzing" };
         await runAnalysis(chatId);
         return res.status(200).json({ ok: true });
       }
@@ -398,7 +366,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error("Webhook error:", err);
+    console.error("Error:", err);
     return res.status(200).json({ ok: true });
   }
 };
