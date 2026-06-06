@@ -51,16 +51,22 @@ async function analyzeWithClaude(stockData, tradingType) {
       ? `${Math.round((s.price - s.low52)/(s.high52 - s.low52)*100)}% من قاع 52أ`
       : "N/A";
     const vol  = s.volRatio >= 1.5 ? `🔥 حجم x${s.volRatio}` : `حجم x${s.volRatio}`;
-   dataText += `${name} (${s.symbol}): [السعر الحالي: ${s.price}﷼ - استخدم هذا السعر بالضبط] | تغير: ${ch} | ${pos} | ${vol}\n`; | ${ch} | ${pos} | ${vol}\n`;
+    dataText  += `${name} (${s.symbol}): [السعر الحالي: ${s.price}﷼ — استخدم هذا السعر بالضبط] | تغير: ${ch} | ${pos} | ${vol}\n`;
   });
 
   const systemPrompt = `أنت محلل متخصص في السوق السعودي (تاسي).
-  قاعدة صارمة: استخدم الأسعار الواردة أدناه بالضبط كما هي.
-لا تعدّل أي سعر ولا تقدّر من عندك.
-سعر الدخول يجب أن يكون ضمن نطاق السعر الحالي المذكور.
+
+قاعدة صارمة لا استثناء فيها:
+- استخدم الأسعار الواردة أدناه بالضبط كما هي
+- لا تعدّل أي سعر ولا تقدّر من عندك
+- entryLow و entryHigh يجب أن يكونا قريبين جداً من السعر الحالي المذكور
+- H1 = السعر الحالي × (1 + نسبة الهدف)
+- H2 = السعر الحالي × (1 + نسبة الهدف الثاني)
+- stop = السعر الحالي × (1 - نسبة الخسارة)
+
 ${SAUDI_CONTEXT}
 
-البيانات الحية:
+البيانات الحية من Yahoo Finance:
 ${dataText}
 
 نوع التداول: ${typeGuide[tradingType]}
@@ -79,8 +85,8 @@ ${dataText}
       "recommendation": "شراء|انتظار|تجنب",
       "reason": "سبب مختصر",
       "catalyst": "المحفز",
-      "entryLow": 26.80,
-      "entryHigh": 27.20,
+      "entryLow": 27.00,
+      "entryHigh": 27.30,
       "h1": 28.50,
       "h1Pct": 4.5,
       "h2": 29.80,
@@ -103,7 +109,7 @@ ${dataText}
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2000,
+      max_tokens: 3000,
       system: systemPrompt,
       messages: [{ role: "user", content: "حلّل وأخرج JSON فقط." }],
     }),
